@@ -1,0 +1,773 @@
+\documentclass[aspectratio=169]{beamer}
+
+% ---------------- THEME ----------------
+\usetheme{Madrid}
+\usecolortheme{default}
+
+% ---------------- PACKAGES ----------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{trees, positioning}
+\usepackage[table]{xcolor}
+\usepackage{colortbl}
+
+
+% ---------------- TITLE INFO ----------------
+\title[Safety Events \& ML]{
+Critical Parameter Identification for Safety Events\\
+in Commercial Aviation Using Machine Learning
+}
+
+\author{ARRIS Yanis \and TEHAMI Safia}
+\institute[UVSQ]{Master 2 AMIS}
+\date{Janvier 2026}
+
+
+% ---------------- DOCUMENT ----------------
+\begin{document}
+
+% ---------- TITLE SLIDE ----------
+\begin{frame}
+  \titlepage
+
+  \vspace{0.05cm}
+  \footnotesize
+  \centering
+  \textbf{Article authors:}\\
+  HyunKi Lee, Sasha Madar, Santusht Sairam,\\
+  Tejas G. Puranik, Michelle Kirby, Olivia J. Pinon,\\
+  Dimitri N. Mavris, Alexia P. Payan\\
+  \vspace{0.15cm}
+  \textit{Aerospace Systems Design Laboratory,\\
+  Georgia Institute of Technology\\
+  MDPI — Aerospace, 2020}
+\end{frame}
+
+
+% ---------- TABLE DES MATIÈRES ----------
+\begin{frame}{Plan de la présentation}
+\tableofcontents
+\end{frame}
+
+% ===============================
+\section{Contexte et problématique}
+% ===============================
+
+%-------------------------------------------------
+\begin{frame}{Contexte}
+\begin{itemize}
+  \item La sécurité aérienne s’appuie aujourd’hui sur l’analyse des \textbf{données issues des vols de routine (FOQA)}.
+  \item La généralisation des \textbf{capteurs embarqués} entraîne une \textbf{accumulation massive de données},
+  atteignant des volumes de l’ordre du téraoctet à l’échelle d’une flotte.
+  \item En parallèle, le trafic aérien connaît une forte croissance :
+  \begin{itemize}
+    \item environ 38 millions de vols en 2018, avec une projection à 90 millions d’ici 2040.
+  \end{itemize}
+  \item L’enjeu principal est donc de transformer cette masse de données
+  en \textbf{connaissance exploitable} pour améliorer la \textbf{prévention des risques}.
+\end{itemize}
+\end{frame}
+
+
+%-------------------------------------------------
+\begin{frame}{Problématique de sécurité aérienne}
+\begin{itemize}
+  \item En sécurité aérienne, l’enjeu n’est pas uniquement d’analyser les accidents,
+  mais de comprendre \textbf{comment ils se construisent progressivement}.
+  
+  \item Cette compréhension repose sur :
+  \begin{itemize}
+    \item l’analyse de la \textbf{chaîne causale} des événements (\textit{pathogenesis}),
+    \item l’identification des \textbf{facteurs sous-jacents} (\textit{etiology}).
+  \end{itemize}
+
+  \item La sécurité aérienne peut être décrite comme un \textbf{continuum} :
+  \begin{center}
+    Précurseurs $\rightarrow$ Événements initiateurs $\rightarrow$ Incidents $\rightarrow$ Accidents
+  \end{center}
+
+  \item \textbf{Objectif :} détecter et anticiper le passage d’un vol \textbf{nominal}
+  vers une situation \textbf{à risque}, \textbf{avant} la survenue d’un incident.
+\end{itemize}
+\end{frame}
+
+
+% ===============================
+\section{Objectifs}
+% ===============================
+
+%-------------------------------------------------
+\begin{frame}{Objectif de l'article}
+\begin{itemize}
+  \item Développer un cadre méthodologique SAFE (Safety Analysis of Flight Events)
+  \item Exploiter les données FOQA pour :
+  \begin{itemize}
+    \item Identifier vols \textbf{à risque} vs vols \textbf{normaux} à partir de \textbf{précurseurs}
+    \item Comprendre la transition vers un \textbf{état dangereux}
+    \item Intervenir \textbf{avant} la survenue d’un incident
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+
+%-------------------------------------------------
+\begin{frame}{Pourquoi les approches classiques atteignent leurs limites ?}
+\begin{itemize}
+  \item Approche souvent \textbf{réactive} : on analyse après l’événement.
+  \item Détection basée sur des \textbf{seuils fixes} définis par des experts \textbf{(SMEs)}.
+\end{itemize}
+
+\vspace{0.15cm}
+\textbf{Limites principales :}
+\begin{itemize}
+  \item Les seuils ne capturent pas bien les \textbf{dégradations progressives}.(Vision \textbf{binaire} : normal / événement)
+  \item Les interactions entre paramètres (effets combinés) sont peu exploitées.
+  \item L’analyse devient difficile à généraliser quand les données sont \textbf{massives} et \textbf{hétérogènes}.
+\end{itemize}
+\end{frame}
+
+% ===============================
+\section{Données FOQA et Machine Learning}
+% ===============================
+
+%-------------------------------------------------
+\begin{frame}{Nature des données utilisées dans l’article}
+\begin{itemize}
+  \item Données issues des \textbf{vols de routine}, appelées
+  \textbf{FOQA} (\textit{Flight Operational Quality Assurance}).
+  \item Enregistrements sous forme d’\textbf{observations successives dans le temps}
+  couvrant l’ensemble du vol.
+  \item Plusieurs centaines à milliers de paramètres, échantillonnés
+  jusqu’à \textbf{16 Hz}.
+  \item Paramètres provenant de systèmes variés :
+  \begin{itemize}
+    \item moteurs, atmosphère, dynamique de vol
+    \item navigation, commandes de vol, configuration avion
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+
+%-------------------------------------------------
+\begin{frame}{Pourquoi du Machine Learning ?}
+\begin{itemize}
+  \item Objectif : passer d’une analyse \textbf{rétrospective} à une analyse plus \textbf{prospective}.
+  \item Le ML permet de :
+  \begin{itemize}
+    \item Exploiter l’\textbf{observability-in-depth}
+    \item Capturer \textbf{patterns complexes et non linéaires}
+    \item Identifier \textbf{précurseurs faibles} avant dépassement des seuils
+  \end{itemize}
+\item Finalité : \textbf{anticiper} les événements de sécurité,
+plutôt que les analyser uniquement a posteriori
+
+\end{itemize}
+\end{frame}
+
+% ===============================
+\section{Méthodologie SAFE}
+% ===============================
+
+%-------------------------------------------------
+\begin{frame}{SAFE : vue d’ensemble}
+La méthodologie SAFE (\textit{Safety Analysis of Flight Events}) est structurée
+en \textbf{cinq étapes successives} visant à transformer les données FOQA
+en information exploitable pour la sécurité aérienne.
+\begin{enumerate}
+  \item Prétraitement des données
+  \item Réduction de la dimensionnalité
+  \item Génération des vecteurs de caractéristiques
+  \item Classification
+  \item Post-traitement et interprétation
+\end{enumerate}
+\end{frame}
+
+%-------------------------------------------------
+\begin{frame}{Étape 1 : Prétraitement des données}
+Objectif : nettoyer les données FOQA brutes afin d’obtenir un jeu exploitable.
+
+\begin{itemize}
+  \item \textbf{suppression} : suppression des paramètres trop incomplets
+  \item \textbf{Replacement} : remplacement des valeurs manquantes pour conserver les vols
+\end{itemize}
+
+\vspace{0.25cm}
+
+\textbf{Exemples (inspirés de l’article) :}
+
+\vspace{0.1cm}
+
+\textbf{suppression :}
+\[
+\begin{array}{c|ccc}
+\text{Temps} & A & B & C \\
+\hline
+10 & 0 & 0.05 & \text{DNE} \\
+11 & 0 & 0.02 & \text{DNE} \\
+12 & 1 & 0.01 & \text{DNE}
+\end{array}
+\;\Rightarrow\;
+\begin{array}{c|cc}
+\text{Temps} & A & B \\
+\hline
+10 & 0 & 0.05 \\
+11 & 0 & 0.02 \\
+12 & 1 & 0.01
+\end{array}
+\]
+
+\vspace{0.15cm}
+
+\textbf{Replacement :}
+\[
+\begin{array}{c|cc}
+\text{Temps} & A & B \\
+\hline
+13 & 1 & \text{Empty} \\
+14 & 1 & \text{Empty}
+\end{array}
+\;\Rightarrow\;
+\begin{array}{c|cc}
+\text{Temps} & A & B \\
+\hline
+13 & 1 & 0.0000 \\
+14 & 1 & 0.0000
+\end{array}
+\]
+
+\footnotesize
+\textit{Les paramètres trop incomplets sont supprimés, les valeurs manquantes ponctuelles sont imputées.}
+\end{frame}
+
+
+%-------------------------------------------------
+\begin{frame}{Étape 2 : Réduction de la dimensionnalité}
+
+Les données FOQA présentent de nombreuses redondances dues à
+des corrélations physiques entre paramètres.
+
+\vspace{0.2cm}
+
+\begin{columns}[T,onlytextwidth]
+
+% -------- MATRICE DE CORRÉLATION --------
+\begin{column}{0.48\textwidth}
+\centering
+\textbf{Matrice de corrélation}
+
+\[
+\begin{array}{c|cccc}
+ & A & B & C & D \\
+\hline
+A & 1 & \cellcolor{green!25}0.996 & \cellcolor{green!25}0.994 & 0.707 \\
+B & 0.996 & 1 & \cellcolor{green!25}0.997 & \cellcolor{green!25}0.991 \\
+C & 0.994 & 0.997 & 1 & 0.947 \\
+D &0.707 & 0.991 & 0.947 & 1 \\
+\end{array}
+\]
+
+\footnotesize
+\textit{Les corrélations $> 0.99$ indiquent des paramètres redondants.}
+\end{column}
+
+% -------- FLÈCHE --------
+\begin{column}{0.08\textwidth}
+\centering
+\vspace{1.6cm}
+$\Longrightarrow$
+\end{column}
+
+% -------- REGROUPEMENT --------
+\begin{column}{0.44\textwidth}
+\centering
+\textbf{Regroupement des paramètres}
+
+\[
+\begin{array}{c|c}
+\text{Paramètre} & \text{Paramètres corrélés} \\
+\hline
+A & [B, C] \\
+B & [C, D] \\
+C & [\,] \\
+D & [E] \\
+E & [\,] \\
+F & [\,]
+\end{array}
+\]
+
+\footnotesize
+\textit{Un seul paramètre est conservé par groupe de forte corrélation
+(seuil : $0.99$), sur la base de l’expertise métier.}
+\end{column}
+
+\end{columns}
+
+\end{frame}
+
+
+%-------------------------------------------------
+\begin{frame}{Étape 3 : Génération des vecteurs de caractéristiques}
+Les observations successives dans le temps sont transformées
+pour être compatibles avec la classification.
+
+\begin{itemize}
+  \item Chaque vol est représenté par un \textbf{vecteur de caractéristiques}
+\end{itemize}
+
+\textbf{Stratégies temporelles proposées :}
+\begin{itemize}
+  \item sélection d’un instant unique
+  \item sélection de timestamps consécutifs avant l’événement
+  \item sélection de timestamps échelonnés
+\end{itemize}
+ 
+\end{frame}
+%-------------------------------------------------
+\begin{frame}{Étape 3 : Génération des vecteurs de caractéristiques\\(un seul timestamp)}
+
+\begin{columns}[T,onlytextwidth]
+
+% -------- COLONNE GAUCHE --------
+\begin{column}{0.52\textwidth}
+\centering
+\textbf{Données temporelles par vol}
+
+\vspace{0.2cm}
+
+\textbf{Flight ID : 123123}
+
+\vspace{0.05cm}
+\footnotesize
+\[
+\begin{array}{ccc}
+\ C & E & F \\
+\hline
+\rowcolor{green!20}10 & 0 & 0.0534 \\
+11 & 0 & 0.0276 \\
+12 & 1 & 0.0129 
+\end{array}
+\]
+
+\vspace{0.35cm}
+
+\textbf{Flight ID : 123126}
+
+\vspace{0.05cm}
+\footnotesize
+\[
+\begin{array}{ccc}
+\ C & E & F \\
+\hline
+\rowcolor{orange!25}16 & 0 & 0.0276 \\
+17 & 1 & 0.0129
+\end{array}
+\]
+\end{column}
+
+% -------- FLÈCHE --------
+\begin{column}{0.06\textwidth}
+\centering
+\vspace{2.2cm}
+$\Longrightarrow$
+\end{column}
+
+% -------- COLONNE DROITE --------
+\begin{column}{0.42\textwidth}
+\centering
+\textbf{Feature Vector Matrix}
+
+\vspace{0.15cm}
+\footnotesize
+\[
+\begin{array}{c|ccc}
+\text{Flight ID} & C & E & F \\
+\hline
+\rowcolor{green!20}123123 & 10 & 0 & 0.0534 \\
+\rowcolor{orange!25}123126 & 16 & 0 & 0.0276 \\
+148279 & 12 & 0 & 0.0386 \\
+213219 & 8 & 0 & 0.1108 \\
+459876 & 21 & 1 & 0.0041
+\end{array}
+\]
+
+\vspace{0.2cm}
+\scriptsize
+\textit{Un instant représentatif est sélectionné par vol.}
+\end{column}
+
+\end{columns}
+
+\end{frame}
+
+%-------------------------------------------------
+\begin{frame}{Étape 3 : Génération des vecteurs de caractéristiques\\(timestamps multiples)}
+
+\begin{columns}[T,onlytextwidth]
+
+% -------- COLONNE GAUCHE --------
+\begin{column}{0.52\textwidth}
+\centering
+\textbf{Données temporelles par vol}
+
+\vspace{0.2cm}
+
+\textbf{Flight ID : 123123}
+
+\vspace{0.05cm}
+\footnotesize
+\[
+\begin{array}{ccc}
+\ C & E & F \\
+\hline
+\rowcolor{green!20}10 & 0 & 0.0534 \\
+\rowcolor{green!20}11 & 0 & 0.0276 \\
+12 & 1 & 0.0129 
+\end{array}
+\]
+
+\vspace{0.35cm}
+
+\textbf{Flight ID : 123126}
+
+\vspace{0.05cm}
+\footnotesize
+\[
+\begin{array}{ccc}
+\ C & E & F \\
+\hline
+\rowcolor{orange!25}16 & 0 & 0.0276 \\
+\rowcolor{orange!25}17 & 1 & 0.0129
+\end{array}
+\]
+\end{column}
+
+% -------- FLÈCHE --------
+\begin{column}{0.06\textwidth}
+\centering
+\vspace{2.2cm}
+$\Longrightarrow$
+\end{column}
+
+% -------- COLONNE DROITE --------
+\begin{column}{0.42\textwidth}
+\centering
+\textbf{Feature Vector Matrix}
+
+\vspace{0.15cm}
+\scriptsize
+\[
+\begin{array}{c|cccccc}
+\text{Flight ID} & C_1 & E_1 & F_1 & C_2 & E_2 & F_2 \\
+\hline
+\rowcolor{green!20}123123 & 10 & 0 & 0.0534 & 11 & 0 & 0.0276 \\
+\rowcolor{orange!25}123126 & 16 & 0 & 0.0276 & 17 & 1 & 0.0129 \\
+148279 & 12 & 0 & 0.0386 & 13 & 1 & 0.0021 \\
+213219 & 8 & 0 & 0.1108 & 9 & 1 & 0.0098 \\
+459876 & 21 & 1 & 0.0041 & 22 & 1 & 0.0017
+\end{array}
+\]
+
+\vspace{0.2cm}
+\scriptsize
+\textit{Plusieurs instants consécutifs sont concaténés pour capturer la dynamique temporelle.}
+\end{column}
+
+\end{columns}
+
+\end{frame}
+
+
+%-------------------------------------------------
+\begin{frame}{Étape 4 : Classification et critères de sélection}
+La sélection de l’algorithme de classification repose sur plusieurs critères définis dans l’article :
+\begin{itemize}
+  \item Capacité à détecter correctement les événements de sécurité (accuracy)
+  \item Robustesse face aux paramètres corrélés
+  \item Capacité à traiter des données de grande dimension
+  \item Robustesse face au surapprentissage
+  \item Capacité à gérer des paramètres hétérogènes
+  \item Simplicité du réglage des hyperparamètres
+\end{itemize}
+
+\vspace{0.2cm}
+Ces critères sont utilisés pour comparer plusieurs algorithmes de classification.
+\end{frame}
+
+\begin{frame}{Comparaison des algorithmes de classification}
+\centering
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Algorithme} & Acc. & Corr. & Dim. & Overf. & Robust. & Tuning \\
+\midrule
+Boosting Ensemble & X & X & X & X &  &  \\
+Decision Tree     & X & X &   &   &  &  \\
+K-NN              &   & X & X &   & X &  \\
+Bayes Class.       &   &   & X &   & X & X \\
+\textbf{Random Forest} & \textbf{X} & \textbf{X} & \textbf{X} & \textbf{X} & \textbf{X} &  \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.25cm}
+\footnotesize
+\textit{Acc. : capacité de prédiction \quad
+Corr. : résistance aux paramètres corrélés \quad
+Dim. : gestion de données de grande dimension \quad
+Overf. : résistance au surapprentissage \quad
+Robust. : capacité à gérer des paramètres hétérogènes \quad
+Tuning : facilité de réglage des hyperparamètres}
+
+
+
+\vspace{0.15cm}
+\textbf{Conclusion :} Random Forest présente le meilleur compromis global,
+en particulier grâce à sa résistance au surapprentissage et à sa capacité
+d’interprétation.
+\end{frame}
+
+
+%-------------------------------------------------
+
+
+\begin{frame}{Random Forest : exemple concret (Tire Speed Event)}
+
+\centering
+
+\begin{tikzpicture}[
+  level distance=1.15cm,
+  level 1/.style={sibling distance=5.8cm},
+  level 2/.style={sibling distance=3.2cm},
+  level 3/.style={sibling distance=1.8cm},
+  every node/.style={
+    draw, rectangle, rounded corners,
+    align=center,
+    font=\scriptsize,
+    inner sep=2.5pt
+  },
+  edge from parent/.style={draw,-},
+  leaf/.style={font=\scriptsize, inner sep=2pt}
+]
+
+% --- ARBRE ---
+\node (root) {Paramètre principal\\\textbf{Vitesse sol}}
+  child {node {Condition 1\\\textbf{Poids élevé ?}}
+    child {node {Condition 1.1\\\textbf{Densité faible ?}}
+      child {node[leaf] {\textcolor{red}{Event}}}
+      child {node[leaf] {No Event}}
+    }
+    child {node {Condition 1.2\\Poids normal}
+      child {node[leaf] {No Event}}
+    }
+  }
+  child {node {Condition 2\\\textbf{Poussée élevée ?}}
+    child {node {Condition 2.1\\Fin de décollage}
+      child {node[leaf] {\textcolor{red}{Event}}}
+      child {node[leaf] {No Event}}
+    }
+    child {node {Condition 2.2\\Poussée normale}
+      child {node[leaf] {No Event}}
+      child {node[leaf] {No Event}}
+    }
+  };
+
+% --- COMMENTAIRE CÔTÉ DROIT ---
+\node[
+  right=1.2cm of root,
+  align=left,
+  font=\footnotesize,
+  draw=none
+] {
+\textbf{Lecture de l’arbre :}\\
+Branche gauche $\rightarrow$ \textbf{Oui}\\
+Branche droite $\rightarrow$ \textbf{Non}
+};
+
+\end{tikzpicture}
+
+
+\vspace{0.3cm}
+
+\begin{block}{Principe de Random Forest}
+\footnotesize
+\begin{itemize}
+  \item Chaque \textbf{arbre de décision} apprend une suite de règles simples
+  basées sur des seuils de paramètres.
+  \item Les arbres sont construits à partir de \textbf{sous-ensembles différents}
+  des données et des paramètres.
+  \item Chaque arbre produit une décision \textit{Event / No Event}.
+  \item La décision finale est obtenue par \textbf{vote majoritaire}
+  de l’ensemble des arbres.
+\end{itemize}
+\end{block}
+
+\end{frame}
+
+
+%-------------------------------------------------
+
+\begin{frame}{Étape 5 : Évaluation et interprétation}
+L’évaluation du modèle repose sur :
+\begin{itemize}
+  \item la \textbf{matrice de confusion}
+  \item le \textbf{F1-score}, particulièrement adapté aux données déséquilibrées
+\end{itemize}
+
+\vspace{0.2cm}
+
+\textbf{Matrice de confusion :}
+\[
+\begin{array}{c|cc}
+ & \text{Event réel} & \text{Non-Event réel} \\
+\hline
+\text{Event prédit} & TP & FP \\
+\text{Non-Event prédit} & FN & TN
+\end{array}
+\]
+
+\vspace{0.2cm}
+
+\textbf{Interprétation :}
+\begin{itemize}
+  \item \textbf{TP (True Positive)} : événement correctement détecté par le modèle
+  \item \textbf{FP (False Positive)} : fausse alerte (événement prédit mais absent)
+  \item \textbf{FN (False Negative)} : événement manqué par le modèle (cas critique en sécurité)
+  \item \textbf{TN (True Negative)} : vol sans événement de sécurité, correctement identifié
+\end{itemize}
+
+\end{frame}
+
+
+%-------------------------------------------------
+\begin{frame}{F1-score : formules et exemple}
+Formules utilisées :
+\[
+Precision = \frac{TP}{TP + FP}
+\quad
+Recall = \frac{TP}{TP + FN}
+\]
+\[
+F1 = \frac{2 \cdot Precision \cdot Recall}{Precision + Recall}
+\]
+
+\vspace{0.2cm}
+\textbf{Exemple (Tire Speed Event, article) :}
+\begin{itemize}
+  \item $TP=55$, $FP=1$, $FN=0$
+\end{itemize}
+
+\[
+Precision \approx 0.982 \quad Recall = 1 \quad F1 \approx 0.991
+\]
+\end{frame}
+
+% ===============================
+\section{Étude de cas}
+% ===============================
+
+%-------------------------------------------------
+\begin{frame}{Étude de cas : Tire Speed Event}
+
+\textbf{Définition :}  
+Le \textbf{Tire Speed Event} correspond au dépassement de la vitesse certifiée
+des pneus lors du décollage.
+
+\vspace{0.2cm}
+
+\textbf{Résultats principaux :}
+\begin{itemize}
+  \item Performances très élevées du modèle
+  \item \textbf{F1-score proche de 1}
+\end{itemize}
+
+\vspace{0.15cm}
+
+\textbf{Paramètres critiques identifiés par SAFE :}
+\begin{itemize}
+  \item Vitesse sol
+  \item Poids de l’avion
+  \item Densité de l’air
+  \item Poussée moteur (thrust)
+\end{itemize}
+
+\vspace{0.15cm}
+
+\textbf{Apport du Machine Learning :}  
+La poussée moteur n’est pas toujours mise en avant dans les descriptions
+classiques, mais l’analyse ML montre qu’elle devient \textbf{significative}
+lorsqu’elle est considérée \textbf{en interaction} avec le poids de l’avion
+et la densité de l’air.
+
+\end{frame}
+
+
+% ===============================
+\section{Discussion des limites et perspectives}
+% ===============================
+
+\begin{frame}{Discussion \& perspectives}
+\centering
+\vfill
+\Large \textbf{Bilan des performances, limites}\\
+\vspace{0.3cm}
+\Large \textbf{et pistes d’amélioration}
+\vfill
+\end{frame}
+
+
+%-------------------------------------------------
+\begin{frame}{Performances et portée du cadre}
+\begin{itemize}
+    \item Le cadre SAFE obtient de bonnes performances globales sur plusieurs types d’événements de sécurité.
+    \item Les scores F1 restent élevés, entre \textbf{0,85 et 0,99}.
+    \item Le cadre est implémentable en pratique et transférable à d’autres contextes.
+    \item Son efficacité dépend fortement de la qualité des définitions d’événements.
+\end{itemize}
+\end{frame}
+%-------------------------------------------------
+\begin{frame}{Limites liées aux définitions et à la causalité}
+\begin{itemize}
+    \item Certains événements restent difficiles à analyser, notamment le Roll Event et le Landing Distance Event.
+    \item Ces difficultés proviennent de définitions imprécises ou non standardisées.
+    \item Une tension existe entre définitions fonctionnelles et définitions physiques.
+    \item Les algorithmes statistiques peuvent confondre corrélation et causalité, introduisant de l’incertitude dans la chaîne causale.
+\end{itemize}
+\end{frame}
+
+%-------------------------------------------------
+\begin{frame}{ML et expertise métier : une approche hybride}
+\begin{itemize}
+    \item Le Machine Learning seul ne suffit pas pour capturer la dynamique réelle des événements.
+    \item L’analyse algorithmique doit être complétée par l’expertise métier (SME).
+    \item Les experts jouent un rôle clé pour contextualiser les résultats et valider leur cohérence physique.
+    \item Une interaction continue entre ML et SME est nécessaire
+pour garantir la validité opérationnelle des résultats.
+\end{itemize}
+\end{frame}
+
+%-------------------------------------------------
+\begin{frame}{Recommandations et perspectives}
+\begin{itemize}
+    \item Adapter la conception des événements en réduisant l’usage de seuils fixes et l’agrégation excessive de sous-événements.
+    \item Adapter les algorithmes afin de limiter les facteurs corrélés mais non causaux.
+    \item Explorer des alternatives aux modèles basés sur des arbres de décision.
+    \item Le ML ouvre la voie à une analyse plus prospective des événements, à condition d’une utilisation critique et raisonnée.
+\end{itemize}
+\end{frame}
+%-------------------------------------------------
+
+\begin{frame}
+\centering
+\vfill
+\Huge \textbf{Merci de votre attention}\\
+\vspace{0.4cm}
+\Large \textit{À vos questions}
+\vfill
+\end{frame}
+
+
+
+\end{document}
